@@ -24,7 +24,8 @@ if not REPLICATE_API_TOKEN:
     st.warning("Please enter your Replicate API token to continue.")
     st.stop()
 
-
+# Initialize replicate client with the provided token
+client = replicate.Client(api_token=REPLICATE_API_TOKEN)
 # Custom CSS for better UI
 st.markdown("""
     <style>
@@ -85,7 +86,7 @@ class FluxImageGenerator:
     def generate_image(self, prompt, params):
         try:
             model_info = self.MODELS[self.current_model]
-            output = replicate.run(
+            output = client.run(
                 f"{model_info['path']}:{model_info['version']}",
                 input={
                     "prompt": prompt,
