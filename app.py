@@ -20,7 +20,6 @@ st.set_page_config(
 # Method 2 Public: Direct input in app 
 
 REPLICATE_API_TOKEN = st.sidebar.text_input("Enter Replicate API Token", type="password")
-os.environ["REPLICATE_API_TOKEN"] = REPLICATE_API_TOKEN
 if not REPLICATE_API_TOKEN:
     st.warning("Please enter your Replicate API token to continue.")
     st.stop()
@@ -91,7 +90,8 @@ class FluxImageGenerator:
                 input={
                     "prompt": prompt,
                     **params
-                }
+                },
+                api_token=REPLICATE_API_TOKEN
             )
             if output and isinstance(output, list) and len(output) > 0:
                 return self.download_image(output[0])
