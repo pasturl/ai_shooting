@@ -117,14 +117,30 @@ def main():
     generator.set_model(selected_model)
     st.sidebar.title("Generation Parameters")
     
-    # Model parameters
+    # Replace aspect_ratio with width and height selection
+    format_options = {
+        "Portrait (160x160)": {"width": 1440, "height": 1440},
+        "Portrait Buchtreppe/Shoeshot (200x230)": {"width": 1252, "height": 1440},
+        "Querformat (200x133)": {"width": 1440, "height": 957},
+        "Promotion A (77x118.9)": {"width": 934, "height": 1440},
+        "Langbahn Papier (75x180)": {"width": 600, "height": 1440},
+        "Langbahn Stoff (99.5x230)": {"width": 623, "height": 1440},
+        "Hochregalmotiv (1000x506)": {"width": 1440, "height": 728},
+        "C-Format Quer Desktop": {"width": 1440, "height": 506},
+        "C-Format Quer Mobile": {"width": 1440, "height": 960},
+        "C-Format Hoch": {"width": 1116, "height": 1440}
+    }
+
+    selected_format = st.sidebar.selectbox(
+        "Image Format",
+        list(format_options.keys())
+    )
+    
+    # Update params dictionary
     params = {
         "num_outputs": st.sidebar.selectbox("Number of Outputs", [1, 2, 3, 4], index=0),
-        "aspect_ratio": st.sidebar.selectbox(
-            "Aspect Ratio",
-            ["1:1", "4:5", "3:4", "2:3", "16:9", "9:16", "3:2", "5:7"],
-            index=0
-        ),
+        "width": format_options[selected_format]["width"],
+        "height": format_options[selected_format]["height"],
         "model": st.sidebar.selectbox("Model", ["dev", "schnell "], index=0),
         "lora_scale": st.sidebar.slider("LoRA Scale", 0.0, 2.0, 1.0, 0.1),        
         "output_format": st.sidebar.selectbox("Output Format", ["png", "jpg", "webp"], index=0),
