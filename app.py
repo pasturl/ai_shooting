@@ -16,6 +16,8 @@ import pathlib
 import re
 import concurrent.futures
 from functools import partial
+from typing import List, Dict
+import random
 
 # Configuration and styling
 st.set_page_config(
@@ -70,6 +72,34 @@ def trigger_download(zip_data, filename="generated_content.zip"):
     """
     st.markdown(download_script, unsafe_allow_html=True)
 
+def create_mock_variations(original_prompt: str, selected_model: str) -> Dict:
+    """Generate mock variations for debug mode"""
+    mock_variations = []
+    styles = ["cinematic", "street photography", "fashion editorial", "urban lifestyle"]
+    focuses = ["product detail", "full body shot", "environmental context", "artistic composition"]
+    
+    for i in range(10):
+        mock_variations.append({
+            "prompt": f"Mock variation {i+1} for: {original_prompt}",
+            "style": random.choice(styles),
+            "focus": random.choice(focuses)
+        })
+    
+    return {"variations": mock_variations}
+
+def create_mock_image() -> Image.Image:
+    """Create a mock image for debug mode"""
+    # Create a random colored image
+    width, height = 512, 512
+    mock_image = Image.new('RGB', (width, height))
+    pixels = mock_image.load()
+    for x in range(width):
+        for y in range(height):
+            pixels[x, y] = (random.randint(0, 255), 
+                          random.randint(0, 255), 
+                          random.randint(0, 255))
+    return mock_image
+
 def generate_prompt_variations(original_prompt, selected_model):
     """Generate 10 variations of the input prompt using Claude"""
     
@@ -84,6 +114,8 @@ def generate_prompt_variations(original_prompt, selected_model):
     # Enhanced prompt template for better variations
     template = """You are a creative AI assistant specializing in generating diverse and artistic image prompts.
     Generate 10 creative variations of the following prompt for image generation.
+    VERY IMPORTANT: stick to the user instructions in the original prompt. 
+    You have to generate prompts of the style of proffesional photo shooting.
     Each variation should:
     1. Maintain the core concept and key elements
     2. Add different proffesional photography setups for fashion campaings 
@@ -92,7 +124,7 @@ def generate_prompt_variations(original_prompt, selected_model):
     5. Be optimized for AI image generation
     6. Always include the product name in the prompt
     
-    Example of promtpts:
+    Example of prompts:
     Street art location: An urban explorer stands before a massive, kaleidoscopic mural covering the side of an abandoned factory, wearing the Air Force Model LORAAIRFORCE sneakers. Dramatic low-angle shot emphasizes the towering scale and vibrant colors of the psychedelic street art. Lens flare and cinematic depth of field direct focus to the sneakers against the urban art backdrop.
     black and white photography, Y2K Street Fashion full body photo of a 24 year old Danish-Cree female enchanting storyteller with Resentful bitterness expression. Her body is Tight, sculpted obliques that frame a flat stomach, toned muscles, abs, small breast, flat chest. She has Rich mocha skin with deep warmth, soft to the touch and velvety in appearance. The skin pores and texture are clearly visible and in focus. Low waisted loose fit baggy jeans, drawstring waist detail with white rope ties, vintage denim wash, black minimalist crop top with thin straps, red paisley print bandana worn as headscarf, plain white athletic sneakers, large black leather tote bag, Y2K fashion, 90s street style, natural outdoor lighting, high quality fashion photography, full body shot, urban setting, professional photo, crisp details, soft shadows     
     A young woman in a vibrant orange outfit, including a hooded bomber jacket, jogger pants, and an orange cap, walking in a graffiti-covered urban alley, with colorful street art in the background, wearing matching orange and black sneakers
@@ -209,8 +241,35 @@ class FluxImageGenerator:
                 },
                 api_token=REPLICATE_API_TOKEN
             )
+            
             if output and isinstance(output, list) and len(output) > 0:
-                return self.download_image(output[0])
+                image = self.download_image(output[0])
+                if image:
+                    # Create timestamp for unique filename
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    
+                    # Create base directory if it doesn't exist
+                    base_dir = pathlib.Path("generated_images")
+                    base_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    # Create safe filename from prompt
+                    safe_prompt = re.sub(r'[^\w\s-]', '', prompt)[:30]
+                    safe_prompt = re.sub(r'[-\s]+', '_', safe_prompt).strip('-_')
+                    
+                    # Save image with timestamp and prompt in filename
+                    filename = f"{timestamp}_{safe_prompt}.{params['output_format']}"
+                    save_path = base_dir / filename
+                    
+                    # Save the image with the specified format and quality
+                    image.save(
+                        save_path, 
+                        format=params['output_format'].upper(),
+                        quality=params['output_quality']
+                    )
+                    
+                    st.success(f"Image saved to: {save_path}")
+                    return image
+                
             return None
         except Exception as e:
             st.error(f"Error generating image: {str(e)}")
@@ -302,6 +361,9 @@ def main():
     # Initialize the generator
     generator = FluxImageGenerator()
     
+    # Debug mode toggle in sidebar
+    debug_mode = st.sidebar.checkbox("Debug Mode", help="Run with mock data instead of API calls")
+    
     # Sidebar controls
     st.sidebar.title("Model Selection")
     selected_model = st.sidebar.selectbox(
@@ -358,59 +420,99 @@ def main():
             
         with st.spinner("🎨 Generating variations and images..."):
             # Generate prompt variations
-            variations = generate_prompt_variations(prompt, selected_model)
+            if debug_mode:
+                mock_response = create_mock_variations(prompt, selected_model)
+                variations = [var["prompt"] for var in mock_response["variations"]]
+                st.session_state.variation_data = mock_response["variations"]
+            else:
+                variations = generate_prompt_variations(prompt, selected_model)
             
             if not variations:
                 st.warning("Failed to generate prompt variations. Using original prompt only.")
                 variations = [prompt]
-            
-            # Create tabs for all variations
-            tabs = st.tabs([f"Variation {i+1}" for i in range(len(variations))])
             
             # Show progress message
             status = st.empty()
             status.text("🎨 Generating images in parallel...")
             
             # Generate images in parallel
-            results = generator.generate_images_parallel(variations, params)
+            if debug_mode:
+                results = [{'image': create_mock_image(), 
+                          'prompt': var, 
+                          'success': True} for var in variations]
+            else:
+                results = generator.generate_images_parallel(variations, params)
             
-            # Process results
-            for i, (tab, result) in enumerate(zip(tabs, results)):
-                with tab:
-                    st.text(f"Prompt: {result['prompt']}")
-                    
+            # Create grid layout for thumbnails
+            st.subheader("Generated Images")
+            thumbnail_cols = st.columns(3)
+            
+            # First display all thumbnails
+            for idx, result in enumerate(results):
+                col = thumbnail_cols[idx % 3]
+                with col:
                     if result['success']:
-                        generated_image = result['image']
-                        
-                        # Display generation parameters
-                        with st.expander("Generation Details", expanded=False):
-                            st.json(params)
-                        
-                        # Display the generated image
-                        st.success("✨ Image generated successfully!")
-                        st.image(generated_image, caption=f"Generated Image - Variation {i+1}", use_column_width=True)
-                        
-                        # Save image to timestamped folder
-                        save_dir = save_generated_image(generated_image, prompt, i+1, params)
-                        st.success(f"✨ Image saved to: {save_dir}")
-                        
-                        # Create download button for this variation
-                        buffered = BytesIO()
-                        with zipfile.ZipFile(buffered, "w") as zip_file:
-                            image_buffer = BytesIO()
-                            generated_image.save(image_buffer, format="PNG")
-                            zip_file.writestr(f"generated_image_variation_{i+1}.png", image_buffer.getvalue())
-                            zip_file.writestr(f"parameters_variation_{i+1}.txt", 
-                                           f"Original Prompt: {prompt}\nVariation: {result['prompt']}\nParameters:\n{params}")
-                        
-                        st.download_button(
-                            label=f"Download Variation {i+1}",
-                            data=buffered.getvalue(),
-                            file_name=f"generated_content_variation_{i+1}.zip",
-                            mime="application/zip"
+                        # Show thumbnail with click functionality
+                        st.image(result['image'], 
+                                caption=f"Variation {idx + 1}", 
+                                use_column_width=True)
+                        if st.button(f"Show Details #{idx + 1}"):
+                            st.session_state.selected_image = idx
+            
+            # Show detailed view if an image is selected
+            if hasattr(st.session_state, 'selected_image'):
+                idx = st.session_state.selected_image
+                result = results[idx]
+                
+                st.markdown("---")
+                st.subheader(f"Variation {idx + 1} Details")
+                
+                # Create two columns for image and details
+                img_col, details_col = st.columns([2, 1])
+                
+                with img_col:
+                    st.image(result['image'], use_column_width=True)
+                
+                with details_col:
+                    st.text_area("Prompt", value=result['prompt'], 
+                               height=100, disabled=True)
+                    
+                    st.markdown("### Generation Parameters")
+                    st.json(params)
+                    
+                    # Save image and create download button
+                    save_dir = save_generated_image(result['image'], 
+                                                  prompt, 
+                                                  idx + 1, 
+                                                  params)
+                    
+                    buffered = BytesIO()
+                    with zipfile.ZipFile(buffered, "w") as zip_file:
+                        image_buffer = BytesIO()
+                        result['image'].save(image_buffer, format="PNG")
+                        zip_file.writestr(
+                            f"generated_image_variation_{idx + 1}.png", 
+                            image_buffer.getvalue()
                         )
-                    else:
-                        error_msg = result.get('error', 'Unknown error')
-                        st.error(f"Failed to generate image: {error_msg}")
+                        zip_file.writestr(
+                            f"parameters_variation_{idx + 1}.txt",
+                            f"Original Prompt: {prompt}\n"
+                            f"Variation: {result['prompt']}\n"
+                            f"Parameters:\n{params}"
+                        )
+                    
+                    st.download_button(
+                        label=f"Download Variation {idx + 1}",
+                        data=buffered.getvalue(),
+                        file_name=f"generated_content_variation_{idx + 1}.zip",
+                        mime="application/zip"
+                    )
+                    
+                    if st.button("Close Details"):
+                        del st.session_state.selected_image
+                        st.experimental_rerun()
+            
+            else:
+                st.info("Click 'Show Details' under any image to see more information")
 if __name__ == "__main__":
     main()
