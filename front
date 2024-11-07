@@ -1,0 +1,223 @@
+import React, { useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+const ImageGenerator = () => {
+  const [prompt, setPrompt] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [generatedImage, setGeneratedImage] = useState(null);
+  const [error, setError] = useState('');
+  
+  const [params, setParams] = useState({
+    num_outputs: 1,
+    aspect_ratio: '1:1',
+    model: 'dev',
+    lora_scale: 1.0,
+    output_format: 'png',
+    guidance_scale: 3.5,
+    output_quality: 90,
+    prompt_strength: 0.8,
+    extra_lora_scale: 1.0,
+    num_inference_steps: 28
+  });
+
+  const models = {
+    "Tiger Model SNKTGWB": "flux-lora-tiger-wb-32-r-1-bz",
+    "Air Force Model LORAAIRFORCE": "flux-lora-test-air-force-div-32-r-1-bz"
+  };
+
+  const [selectedModel, setSelectedModel] = useState(Object.keys(models)[0]);
+
+  const updateParams = (key, value) => {
+    setParams(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleGenerate = async () => {
+    if (!prompt) {
+      setError('Please enter a prompt first.');
+      return;
+    }
+
+    setGenerating(true);
+    setError('');
+    setProgress(0);
+
+    // Progress simulation
+    const progressInterval = setInterval(() => {
+      setProgress(prev => Math.min(prev + 1, 99));
+    }, 100);
+
+    try {
+      const response = await fetch('http://localhost:8000/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          params,
+          model: models[selectedModel]
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate image');
+      }
+
+      const data = await response.json();
+      setGeneratedImage(data.image_url);
+      setProgress(100);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      clearInterval(progressInterval);
+      setGenerating(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image_url: generatedImage,
+          prompt,
+          params
+        }),
+      });
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'generated_content.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Failed to download content');
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>🎨 Flux Image Generator</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Sidebar Controls */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Model Selection</h3>
+                <Select value={selectedModel} onValueChange={setSelectedModel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(models).map(model => (
+                      <SelectItem key={model} value={model}>
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Parameters</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label>Number of Outputs</label>
+                    <Select
+                      value={params.num_outputs.toString()}
+                      onValueChange={(value) => updateParams('num_outputs', parseInt(value))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4].map(num => (
+                          <SelectItem key={num} value={num.toString()}>
+                            {num}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label>LoRA Scale</label>
+                    <Slider
+                      value={[params.lora_scale]}
+                      min={0}
+                      max={2}
+                      step={0.1}
+                      onValueChange={([value]) => updateParams('lora_scale', value)}
+                    />
+                  </div>
+
+                  {/* Add other parameter controls similarly */}
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="md:col-span-3 space-y-4">
+              <Textarea
+                placeholder="Enter your prompt"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="h-32"
+              />
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {generating && (
+                <Progress value={progress} className="w-full" />
+              )}
+
+              <Button
+                onClick={handleGenerate}
+                disabled={generating || !prompt}
+                className="w-full"
+              >
+                {generating ? 'Generating...' : 'Generate Image'}
+              </Button>
+
+              {generatedImage && (
+                <div className="space-y-4">
+                  <img
+                    src={generatedImage}
+                    alt="Generated"
+                    className="w-full rounded-lg shadow-lg"
+                  />
+                  <Button onClick={handleDownload} className="w-full">
+                    Download ZIP
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default ImageGenerator;

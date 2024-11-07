@@ -7,6 +7,16 @@ from io import BytesIO
 import time
 import zipfile
 import base64
+from langchain_anthropic import ChatAnthropic
+from langchain.prompts import ChatPromptTemplate
+import json
+import asyncio
+from datetime import datetime
+import pathlib
+import re
+import concurrent.futures
+from functools import partial
+
 # Configuration and styling
 st.set_page_config(
     page_title="Flux Image Generator",
@@ -26,6 +36,13 @@ if not REPLICATE_API_TOKEN:
 
 # Initialize replicate client with the provided token
 client = replicate.Client(api_token=REPLICATE_API_TOKEN)
+
+# Add this after the REPLICATE_API_TOKEN initialization
+ANTHROPIC_API_KEY = st.sidebar.text_input("Enter Anthropic API Key", type="password")
+if not ANTHROPIC_API_KEY:
+    st.warning("Please enter your Anthropic API key to continue.")
+    st.stop()
+
 # Custom CSS for better UI
 st.markdown("""
     <style>
@@ -52,6 +69,103 @@ def trigger_download(zip_data, filename="generated_content.zip"):
         </script>
     """
     st.markdown(download_script, unsafe_allow_html=True)
+
+def generate_prompt_variations(original_prompt, selected_model):
+    """Generate 10 variations of the input prompt using Claude"""
+    
+    # Initialize Claude with better parameters for creative variations
+    llm = ChatAnthropic(
+        anthropic_api_key=ANTHROPIC_API_KEY,
+        model="claude-3-sonnet-20240229",
+        temperature=0.8,
+        max_tokens=2000
+    )
+    
+    # Enhanced prompt template for better variations
+    template = """You are a creative AI assistant specializing in generating diverse and artistic image prompts.
+    Generate 10 creative variations of the following prompt for image generation.
+    Each variation should:
+    1. Maintain the core concept and key elements
+    2. Add different proffesional photography setups for fashion campaings 
+    3. Vary perspectives and compositions
+    4. Include specific details that enhance the visual appeal
+    5. Be optimized for AI image generation
+    6. Always include the product name in the prompt
+    
+    Example of promtpts:
+    Street art location: An urban explorer stands before a massive, kaleidoscopic mural covering the side of an abandoned factory, wearing the Air Force Model LORAAIRFORCE sneakers. Dramatic low-angle shot emphasizes the towering scale and vibrant colors of the psychedelic street art. Lens flare and cinematic depth of field direct focus to the sneakers against the urban art backdrop.
+    black and white photography, Y2K Street Fashion full body photo of a 24 year old Danish-Cree female enchanting storyteller with Resentful bitterness expression. Her body is Tight, sculpted obliques that frame a flat stomach, toned muscles, abs, small breast, flat chest. She has Rich mocha skin with deep warmth, soft to the touch and velvety in appearance. The skin pores and texture are clearly visible and in focus. Low waisted loose fit baggy jeans, drawstring waist detail with white rope ties, vintage denim wash, black minimalist crop top with thin straps, red paisley print bandana worn as headscarf, plain white athletic sneakers, large black leather tote bag, Y2K fashion, 90s street style, natural outdoor lighting, high quality fashion photography, full body shot, urban setting, professional photo, crisp details, soft shadows     
+    A young woman in a vibrant orange outfit, including a hooded bomber jacket, jogger pants, and an orange cap, walking in a graffiti-covered urban alley, with colorful street art in the background, wearing matching orange and black sneakers
+    A bold Japanese hyperrealistic advertising poster features a stunning Asian model with sleek, blonde hair cut in an extraordinary style that frames her angular face. She exudes confidence while wearing modern, oversized coloured baggy jeans paired with a matching loose-fitting top in another colour. The outfit is accentuated with chunky white sneakers and layered gold necklaces, blending street style with effortless chic. She stands in front of a futuristic urban background with neon signs and soft glowing lanterns, set against a sleek cityscape at night. Behind her, cherry blossoms softly fall, contrasting with the modern environment. Bold kanji characters in dynamic, graffiti-like style read âèªç±ãªç¾ - The Freedom of Beautyâ across the top. The posterâs aesthetic merges contemporary fashion with traditional Japanese elements, creating an energetic, youthful vibe.
+    photograph of an overgrown grass field, woman, low angle, long brunette hair blowing in the wind, looking away, light makeup, wearing a sleeveless crop top showing off her fit midriff, long pants, sneakers, dynamic pose, cloudy sky, midday, aidmaExperimentalPhotography
+    Nighttime city street scene: Under the neon glow of city lights, an urban explorer wearing the Air Force Model LORAAIRFORCE sneakers confidently strides across a rain-slicked street. Dramatic low-angle shot captures motion blur and reflections in the shimmering puddles. Skyscrapers loom in the misty background, encapsulating the adrenaline of nightlife in the urban jungle.
+    
+    product: {selected_model}
+    Original prompt: {original_prompt}
+    
+    Return ONLY a JSON response in this exact format:
+    {{
+        "variations": [
+            {{
+                "prompt": "complete prompt text",
+                "style": "artistic style used",
+                "focus": "main focus/perspective of this variation"
+            }},
+            // ... (9 more variations)
+        ]
+    }}
+    
+    Make each variation unique and creative while staying true to the original concept.
+    Focus on creating high-quality, detailed prompts that will work well with AI image generation."""
+    
+    prompt = ChatPromptTemplate.from_template(template)
+    
+    try:
+        with st.spinner("🤔 Generating prompt variations..."):
+            # Get response from Claude
+            response = llm.invoke(prompt.format(original_prompt=original_prompt, selected_model=selected_model))
+            
+            # Parse the JSON response
+            try:
+                # Extract the JSON part from the response
+                json_str = response.content.strip()
+                response_data = json.loads(json_str)
+                
+                # Create a container to display variations
+                variation_container = st.container()
+                
+                with variation_container:
+                    st.subheader("📝 Generated Prompt Variations")
+                    cols = st.columns(2)
+                    
+                    for idx, var_data in enumerate(response_data.get("variations", []), 1):
+                        col = cols[0] if idx <= 5 else cols[1]
+                        with col:
+                            with st.expander(f"Variation {idx}", expanded=False):
+                                st.markdown(f"""
+                                **Prompt:** {var_data['prompt']}
+                                
+                                **Style:** {var_data['style']}
+                                
+                                **Focus:** {var_data['focus']}
+                                """)
+                
+                # Extract just the prompts for image generation
+                variations = [item["prompt"] for item in response_data.get("variations", [])]
+                
+                # Store the full variation data in session state for later use
+                st.session_state.variation_data = response_data.get("variations", [])
+                
+                return variations
+                
+            except json.JSONDecodeError as e:
+                st.error(f"Error parsing JSON response: {str(e)}")
+                return [original_prompt]
+
+    except Exception as e:
+        st.error(f"Error generating prompt variations: {str(e)}")
+        st.error("Detailed error information:", exc_info=True)
+        return [original_prompt]  # Fallback to original prompt if generation fails
 
 class FluxImageGenerator:
     def __init__(self):
@@ -84,6 +198,7 @@ class FluxImageGenerator:
             return None
         
     def generate_image(self, prompt, params):
+        """Generate a single image"""
         try:
             model_info = self.MODELS[self.current_model]
             output = client.run(
@@ -100,6 +215,86 @@ class FluxImageGenerator:
         except Exception as e:
             st.error(f"Error generating image: {str(e)}")
             return None
+
+    def generate_images_parallel(self, variations, params, max_workers=3):
+        """Generate multiple images in parallel"""
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Create a partial function with fixed params
+            generate_func = partial(self.generate_image, params=params)
+            
+            # Submit all tasks and get future objects
+            future_to_prompt = {
+                executor.submit(generate_func, prompt): (i, prompt) 
+                for i, prompt in enumerate(variations)
+            }
+            
+            # Dictionary to store results
+            results = {}
+            
+            # Process completed tasks as they finish
+            for future in concurrent.futures.as_completed(future_to_prompt):
+                idx, prompt = future_to_prompt[future]
+                try:
+                    image = future.result()
+                    results[idx] = {
+                        'image': image,
+                        'prompt': prompt,
+                        'success': image is not None
+                    }
+                except Exception as e:
+                    results[idx] = {
+                        'image': None,
+                        'prompt': prompt,
+                        'success': False,
+                        'error': str(e)
+                    }
+            
+            # Sort results by original index
+            return [results[i] for i in range(len(variations))]
+
+def create_safe_filename(prompt, max_length=30):
+    """Create a safe filename from the prompt"""
+    # Remove special characters and replace spaces with underscores
+    safe_prompt = re.sub(r'[^\w\s-]', '', prompt)
+    safe_prompt = re.sub(r'[-\s]+', '_', safe_prompt).strip('-_')
+    # Truncate to max_length characters
+    return safe_prompt[:max_length]
+
+def save_generated_image(image, prompt, variation_num, params):
+    """Save the generated image and its parameters in a timestamped folder"""
+    # Create timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Create safe filename from prompt
+    safe_prompt = create_safe_filename(prompt)
+    
+    # Create base directory for saved images
+    base_dir = pathlib.Path("generated_images")
+    
+    # Create folder with timestamp and prompt
+    folder_name = f"{timestamp}_{safe_prompt}"
+    save_dir = base_dir / folder_name
+    
+    # Create directories if they don't exist
+    save_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save image
+    image_filename = f"variation_{variation_num}.png"
+    image_path = save_dir / image_filename
+    image.save(image_path, "PNG")
+    
+    # Save parameters
+    params_filename = f"variation_{variation_num}_params.txt"
+    params_path = save_dir / params_filename
+    with open(params_path, "w") as f:
+        f.write(f"Original Prompt: {prompt}\n")
+        f.write(f"Timestamp: {timestamp}\n")
+        f.write(f"Variation: {variation_num}\n")
+        f.write("\nParameters:\n")
+        for key, value in params.items():
+            f.write(f"{key}: {value}\n")
+    
+    return save_dir
 
 def main():
     st.title("🎨 Flux Image Generator")
@@ -141,14 +336,14 @@ def main():
         "num_outputs": st.sidebar.selectbox("Number of Outputs", [1, 2, 3, 4], index=0),
         "width": format_options[selected_format]["width"],
         "height": format_options[selected_format]["height"],
-        "model": st.sidebar.selectbox("Model", ["dev", "schnell "], index=0),
+        "model": st.sidebar.selectbox("Model", ["schnell", "dev"], index=0),
         "lora_scale": st.sidebar.slider("LoRA Scale", 0.0, 2.0, 1.0, 0.1),        
         "output_format": st.sidebar.selectbox("Output Format", ["png", "jpg", "webp"], index=0),
         "guidance_scale": st.sidebar.slider("Guidance Scale", 1.0, 20.0, 3.5, 0.5),
         "output_quality": st.sidebar.slider("Output Quality", 1, 100, 90, 1),
         "prompt_strength": st.sidebar.slider("Prompt Strength", 0.0, 1.0, 0.8, 0.1),
         "extra_lora_scale": st.sidebar.slider("Extra LoRA Scale", 0.0, 2.0, 1.0, 0.1),
-        "num_inference_steps": st.sidebar.slider("Inference Steps", 1, 50, 28, 1)
+        "num_inference_steps": st.sidebar.slider("Inference Steps", 1, 50, 4, 1)
     }
     
     # Main area
@@ -161,45 +356,61 @@ def main():
             st.warning("Please enter a prompt first.")
             return
             
-        with st.spinner("🎨 Generating your image..."):
-            # Progress bar
-            progress_bar = st.progress(0)
-            for i in range(100):
-                time.sleep(0.01)
-                progress_bar.progress(i + 1)
+        with st.spinner("🎨 Generating variations and images..."):
+            # Generate prompt variations
+            variations = generate_prompt_variations(prompt, selected_model)
             
-            # Generate image
-            generated_image = generator.generate_image(prompt, params)
+            if not variations:
+                st.warning("Failed to generate prompt variations. Using original prompt only.")
+                variations = [prompt]
             
-            if generated_image:
-                # Display generation parameters
-                with st.expander("Generation Details", expanded=False):
-                    st.json(params)
-                
-                # Display the generated image
-                st.success("✨ Image generated successfully!")
-                st.image(generated_image, caption="Generated Image", use_column_width=True)
-                
-                # Create a download button for the image
-                buffered = BytesIO()
-                with zipfile.ZipFile(buffered, "w") as zip_file:
-                    # Save the image
-                    image_buffer = BytesIO()
-                    generated_image.save(image_buffer, format="PNG")
-                    zip_file.writestr("generated_image.png", image_buffer.getvalue())
+            # Create tabs for all variations
+            tabs = st.tabs([f"Variation {i+1}" for i in range(len(variations))])
+            
+            # Show progress message
+            status = st.empty()
+            status.text("🎨 Generating images in parallel...")
+            
+            # Generate images in parallel
+            results = generator.generate_images_parallel(variations, params)
+            
+            # Process results
+            for i, (tab, result) in enumerate(zip(tabs, results)):
+                with tab:
+                    st.text(f"Prompt: {result['prompt']}")
                     
-                    # Save the prompt and parameters as text
-                    zip_file.writestr("parameters.txt", f"Prompt: {prompt}\nParameters:\n{params}")
-                # Trigger the automatic download
-                trigger_download(buffered.getvalue())
-
-                st.download_button(
-                    label="Download ZIP",
-                    data=buffered.getvalue(),
-                    file_name="generated_content.zip",
-                    mime="application/zip"
-                )
-            else:
-                st.error("Failed to generate image. Please try again.")
+                    if result['success']:
+                        generated_image = result['image']
+                        
+                        # Display generation parameters
+                        with st.expander("Generation Details", expanded=False):
+                            st.json(params)
+                        
+                        # Display the generated image
+                        st.success("✨ Image generated successfully!")
+                        st.image(generated_image, caption=f"Generated Image - Variation {i+1}", use_column_width=True)
+                        
+                        # Save image to timestamped folder
+                        save_dir = save_generated_image(generated_image, prompt, i+1, params)
+                        st.success(f"✨ Image saved to: {save_dir}")
+                        
+                        # Create download button for this variation
+                        buffered = BytesIO()
+                        with zipfile.ZipFile(buffered, "w") as zip_file:
+                            image_buffer = BytesIO()
+                            generated_image.save(image_buffer, format="PNG")
+                            zip_file.writestr(f"generated_image_variation_{i+1}.png", image_buffer.getvalue())
+                            zip_file.writestr(f"parameters_variation_{i+1}.txt", 
+                                           f"Original Prompt: {prompt}\nVariation: {result['prompt']}\nParameters:\n{params}")
+                        
+                        st.download_button(
+                            label=f"Download Variation {i+1}",
+                            data=buffered.getvalue(),
+                            file_name=f"generated_content_variation_{i+1}.zip",
+                            mime="application/zip"
+                        )
+                    else:
+                        error_msg = result.get('error', 'Unknown error')
+                        st.error(f"Failed to generate image: {error_msg}")
 if __name__ == "__main__":
     main()

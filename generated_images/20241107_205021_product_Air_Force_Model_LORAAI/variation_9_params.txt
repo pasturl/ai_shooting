@@ -1,0 +1,21 @@
+Original Prompt: product: Air Force Model LORAAIRFORCE
+use this exact product description with all the words in all the prompts:
+"Front toe box: Pink/coral. Side Nike swoosh: Orange-red. Mid-panel (middle section): Red and burgundy. Heel section: Dark navy/black. Side panel near the toe: Light blue/powder blue. Midsole: White"
+
+CAMPAING STYLE
+disco and music festivals style
+Timestamp: 20241107_205021
+Variation: 9
+
+Parameters:
+num_outputs: 1
+width: 1440
+height: 1440
+model: schnell
+lora_scale: 1.0
+output_format: png
+guidance_scale: 3.5
+output_quality: 90
+prompt_strength: 0.8
+extra_lora_scale: 1.0
+num_inference_steps: 4

@@ -1,2 +1,5 @@
 replicate
 streamlit
+langchain
+langchain-anthropic
+anthropic

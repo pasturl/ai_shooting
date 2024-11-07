@@ -1,0 +1,30 @@
+Original Prompt: product: Air Force Model LORAAIRFORCE
+use this specific product description in all the prompts:
+ Front toe box: Pink/coral. Side Nike swoosh: Orange-red. Mid-panel (middle section): Red and burgundy. Heel section: Dark navy/black. Side panel near the toe: Light blue/powder blue. Midsole: White
+
+"Digital Native Series"
+Theme: Merging physical and digital worlds
+Key Message: "Step Into Your Reality"
+Concept: Blend real sneakers with digital culture elements:
+
+
+AR/VR overlays
+Gaming-inspired environments
+Social media-style filters
+Tech-inspired design elements
+Digital art collaborations 
+Timestamp: 20241107_204330
+Variation: 1
+
+Parameters:
+num_outputs: 1
+width: 1440
+height: 1440
+model: dev
+lora_scale: 1.0
+output_format: png
+guidance_scale: 3.5
+output_quality: 90
+prompt_strength: 0.8
+extra_lora_scale: 1.0
+num_inference_steps: 28
