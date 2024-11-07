@@ -112,26 +112,52 @@ def generate_prompt_variations(original_prompt, selected_model):
     )
     
     # Enhanced prompt template for better variations
-    template = """You are a creative AI assistant specializing in generating diverse and artistic image prompts.
-    Generate 10 creative variations of the following prompt for image generation.
-    VERY IMPORTANT: stick to the user instructions in the original prompt. 
-    You have to generate prompts of the style of proffesional photo shooting.
-    Each variation should:
-    1. Maintain the core concept and key elements
-    2. Add different proffesional photography setups for fashion campaings 
-    3. Vary perspectives and compositions
-    4. Include specific details that enhance the visual appeal
-    5. Be optimized for AI image generation
-    6. Always include the product name in the prompt
+    template = """You are an expert AI assistant specializing in generating professional-grade fashion photography prompts, with deep knowledge of commercial product photography, lighting techniques, and contemporary fashion campaigns.
+
+CORE OBJECTIVES:
+1. Generate 10 highly detailed, commercial-quality variations of the provided prompt
+2. Ensure each prompt is optimized for AI image generation
+3. Maintain consistent focus on the footwear product while creating compelling scene compositions
+4. ALWAYS focus on the footwear product as the hero of the image.
+5. NEVER include people on the images.
+
+PROMPT REQUIREMENTS:
+Each variation MUST include:
+
+1. TECHNICAL SPECIFICATIONS
+- Precise camera angles (e.g., "shot at 35mm, f/2.8 aperture")
+- Specific lighting setup (e.g., "three-point lighting with rim light")
+- Resolution and quality markers (e.g., "8K, hyperrealistic, photorealistic")
+- Post-processing style (e.g., "slight film grain, Kodak Portra 400 colors")
+
+2. ENVIRONMENT & COMPOSITION
+- Detailed setting description
+- Time of day and weather conditions
+- Generate realistic scenes that match a footwear campaign.
+- Specific composition rules (Rule of thirds, leading lines, etc.)
+- Distance and framing (close-up, medium shot, wide shot)
+
+4. PRODUCT EMPHASIS
+- {selected_model} placement and interaction with environment
+- Key product features to highlight
+- Natural integration into the scene
+
+5. ATMOSPHERE & MOOD
+- Color palette and color grading
+- Atmospheric elements (fog, shadows, reflections)
+- Emotional tone of the image
+
+
+FORBIDDEN ELEMENTS:
+- Avoid generic descriptors (beautiful, nice, amazing)
+- No unrealistic or physically impossible scenarios
+- Avoid overshadowing the product with complex scenes
+- No technical impossibilities for AI generation
     
-    Example of prompts:
-    Street art location: An urban explorer stands before a massive, kaleidoscopic mural covering the side of an abandoned factory, wearing the Air Force Model LORAAIRFORCE sneakers. Dramatic low-angle shot emphasizes the towering scale and vibrant colors of the psychedelic street art. Lens flare and cinematic depth of field direct focus to the sneakers against the urban art backdrop.
-    black and white photography, Y2K Street Fashion full body photo of a 24 year old Danish-Cree female enchanting storyteller with Resentful bitterness expression. Her body is Tight, sculpted obliques that frame a flat stomach, toned muscles, abs, small breast, flat chest. She has Rich mocha skin with deep warmth, soft to the touch and velvety in appearance. The skin pores and texture are clearly visible and in focus. Low waisted loose fit baggy jeans, drawstring waist detail with white rope ties, vintage denim wash, black minimalist crop top with thin straps, red paisley print bandana worn as headscarf, plain white athletic sneakers, large black leather tote bag, Y2K fashion, 90s street style, natural outdoor lighting, high quality fashion photography, full body shot, urban setting, professional photo, crisp details, soft shadows     
-    A young woman in a vibrant orange outfit, including a hooded bomber jacket, jogger pants, and an orange cap, walking in a graffiti-covered urban alley, with colorful street art in the background, wearing matching orange and black sneakers
-    A bold Japanese hyperrealistic advertising poster features a stunning Asian model with sleek, blonde hair cut in an extraordinary style that frames her angular face. She exudes confidence while wearing modern, oversized coloured baggy jeans paired with a matching loose-fitting top in another colour. The outfit is accentuated with chunky white sneakers and layered gold necklaces, blending street style with effortless chic. She stands in front of a futuristic urban background with neon signs and soft glowing lanterns, set against a sleek cityscape at night. Behind her, cherry blossoms softly fall, contrasting with the modern environment. Bold kanji characters in dynamic, graffiti-like style read âèªç±ãªç¾ - The Freedom of Beautyâ across the top. The posterâs aesthetic merges contemporary fashion with traditional Japanese elements, creating an energetic, youthful vibe.
-    photograph of an overgrown grass field, woman, low angle, long brunette hair blowing in the wind, looking away, light makeup, wearing a sleeveless crop top showing off her fit midriff, long pants, sneakers, dynamic pose, cloudy sky, midday, aidmaExperimentalPhotography
-    Nighttime city street scene: Under the neon glow of city lights, an urban explorer wearing the Air Force Model LORAAIRFORCE sneakers confidently strides across a rain-slicked street. Dramatic low-angle shot captures motion blur and reflections in the shimmering puddles. Skyscrapers loom in the misty background, encapsulating the adrenaline of nightlife in the urban jungle.
-    
+    EXAMPLE PROMPT STRUCTURE:
+    "Professional fashion campaign shot of {selected_model} sneakers, captured at 35mm with f/2.8 aperture. Three-point lighting setup with key light at 45 degrees. Setting: Modern concrete architecture with strong geometric shadows, shot during golden hour. Product positioned at lower third, emphasized by natural leading lines in architecture. Kodak Portra 400 color grading, slight film grain, 8K resolution. Style: minimal editorial fashion photography with strong architectural elements."
+
+    Remember to make each variation unique while maintaining consistent professional quality and commercial viability. Focus on creating prompts that combine technical precision with artistic vision, always keeping the product as the hero of the image. 
     product: {selected_model}
     Original prompt: {original_prompt}
     
@@ -196,7 +222,7 @@ def generate_prompt_variations(original_prompt, selected_model):
 
     except Exception as e:
         st.error(f"Error generating prompt variations: {str(e)}")
-        st.error("Detailed error information:", exc_info=True)
+        st.exception(e)  # This will show the full traceback
         return [original_prompt]  # Fallback to original prompt if generation fails
 
 class FluxImageGenerator:
