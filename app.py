@@ -263,39 +263,40 @@ class FluxImageGenerator:
             "Girl": {
                 "Girl All K099SS25": {
                     "path": "pasturl/girl-all-20241205",
-                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                    "version": "b63da554393f4301362f20ee1e24feeb39f65c631f18c2d1de427a81f8fe0dbb"  # You'll provide this
                 },
                 "Girl Product K099SS25": {
                     "path": "pasturl/girl-product-20241205",
-                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                    "version": "8bca961342758bb79afaca56ecabc4e9a37f6bb74a6239187292d560a97d5b27"  # You'll provide this
                 },
                 "Girl Person K099SS25": {
                     "path": "pasturl/girl-person-20241205",
-                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                    "version": "eda98130a797b63b6103f5b0323d7e3159a914e7ae00c649116444f5ac752203"  # You'll provide this
                 }
             },
             "Man": {
+                "Man All K099SS25": {
+                    "path": "pasturl/man-all-20241205",
+                    "version": "1c94843e590febbbdc057cb06563ff3b572e69f78271dbc2b34ac095272ae36c"  # You'll provide this
+                },
                 "Man Person K099SS25": {
                     "path": "pasturl/man-person-20241205",
-                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                    "version": "334802db778909fbb85b38c60015bd7ec2ada02ff74b9b1dbb321e05208ba14e"  # You'll provide this
                 },
                 "Man Product K099SS25": {
                     "path": "pasturl/man-product-20241205",
-                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
-                },
-                "Man All K099SS25": {
-                    "path": "pasturl/man-all-20241205",
-                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                    "version": "65425ee5d4fc5bcb9c137845686fe575c50fb28ce2e2d4290cd4234a3739b314"  # You'll provide this
                 }
+                
             },
             "Woman": {
                 "Woman All K099SS25": {
                     "path": "pasturl/woman-all-20241205",
-                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                    "version": "d07b380d51c3373e0504bb67645b80b5882b094d74f58046690ee77a9e77ec59"  # You'll provide this
                 },
                 "Woman Person K099SS25": {
                     "path": "pasturl/woman-person-20241205",
-                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                    "version": "df7837b4fd073a131272b23a10ff1d3988e2b0d9b153ea16682104cb8789c91e"  # You'll provide this
                 },
                 "Woman Product K099SS25": {
                     "path": "pasturl/woman-product-20241205",
