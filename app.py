@@ -31,19 +31,25 @@ st.set_page_config(
 
 # Method 2 Public: Direct input in app 
 
-REPLICATE_API_TOKEN = st.sidebar.text_input("Enter Replicate API Token", type="password")
-if not REPLICATE_API_TOKEN:
-    st.warning("Please enter your Replicate API token to continue.")
-    st.stop()
+try:
+    REPLICATE_API_TOKEN = st.secrets["REPLICATE_API_TOKEN"]
+except KeyError:
+    REPLICATE_API_TOKEN = st.sidebar.text_input("Enter Replicate API Token", type="password")
+    if not REPLICATE_API_TOKEN:
+        st.warning("Please enter your Replicate API token to continue.")
+        st.stop()
 
 # Initialize replicate client with the provided token
 client = replicate.Client(api_token=REPLICATE_API_TOKEN)
 
-# Add this after the REPLICATE_API_TOKEN initialization
-ANTHROPIC_API_KEY = st.sidebar.text_input("Enter Anthropic API Key", type="password")
-if not ANTHROPIC_API_KEY:
-    st.warning("Please enter your Anthropic API key to continue.")
-    st.stop()
+# Replace the Anthropic API key initialization with:
+try:
+    ANTHROPIC_API_KEY = st.secrets["ANTHROPIC_API_KEY"]
+except KeyError:
+    ANTHROPIC_API_KEY = st.sidebar.text_input("Enter Anthropic API Key", type="password")
+    if not ANTHROPIC_API_KEY:
+        st.warning("Please enter your Anthropic API key to continue.")
+        st.stop()
 
 # Custom CSS for better UI
 st.markdown("""
