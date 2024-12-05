@@ -234,22 +234,84 @@ FORBIDDEN ELEMENTS:
 class FluxImageGenerator:
     def __init__(self):
         self.MODELS = {
-            "Tiger Model SNKTGWB": {
-                "path": "pasturl/flux-lora-tiger-wb-32-r-1-bz",
-                "version": "19b13186dae1abe145426ba7b85fd542d8a0691aecd758c82aae54d3715cfe92"
+            "Boy": {
+                "Kids boy K099SS25 person product all 2k": {
+                    "path": "pasturl/kids-boy-person-product-all-2k-20241204",
+                    "version": "dd4d1f7de8688f3970701ca3845bf47333acf40d46c37c36c9caf73dd3127816"
+                },
+                "Kids boy K099SS25 person product all": {
+                    "path": "pasturl/kids-boy-person-product-all-20241204",
+                    "version": "10f3a469f79d8182293ca200a67abc39c5f1a0d28dba4e111f83c1f0c6001f38"
+                },
+                "Kids boy K099SS25 person selection": {
+                    "path": "pasturl/kids-boy-person-all-selection-20241204",
+                    "version": "442ba5c5135bff2516b5381df66c9e246369163c354f9b3b541920c6afb1b01f"
+                },
+                "Kids boy K099SS25 person all": {
+                    "path": "pasturl/kids-boy-person-all-both-20241204",
+                    "version": "bc7e3ea2bc02781dbafb270c7de6d0174288c2444b5dd060c0bc57116535ebb3"
+                },
+                "Kids boy K099SS25 product all": {
+                    "path": "pasturl/kids-boy-all-both-20241204",
+                    "version": "caeb33745d8279fc12ce866578ab6362ce427d800d94cc6d726258d2d92f7fc4"
+                },
+                "Kids boy K099SS25 all": {
+                    "path": "pasturl/kids-boy-all-20241204",
+                    "version": "d505363e63120456420e85c19ce88005cc6033d078bd69d7c8e58cca0a76714f"
+                }
             },
-            "Air Force Model LORAAIRFORCE": {
-                "path": "pasturl/flux-lora-test-air-force-div-32-r-1-bz",
-                "version": "857513f74c939191ae8b7ba05510a13d228f56b9d753509117bbcc774087e243" 
+            "Girl": {
+                "Girl All K099SS25": {
+                    "path": "pasturl/girl-all-20241205",
+                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                },
+                "Girl Product K099SS25": {
+                    "path": "pasturl/girl-product-20241205",
+                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                },
+                "Girl Person K099SS25": {
+                    "path": "pasturl/girl-person-20241205",
+                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                }
+            },
+            "Man": {
+                "Man Person K099SS25": {
+                    "path": "pasturl/man-person-20241205",
+                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                },
+                "Man Product K099SS25": {
+                    "path": "pasturl/man-product-20241205",
+                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                },
+                "Man All K099SS25": {
+                    "path": "pasturl/man-all-20241205",
+                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                }
+            },
+            "Woman": {
+                "Woman All K099SS25": {
+                    "path": "pasturl/woman-all-20241205",
+                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                },
+                "Woman Person K099SS25": {
+                    "path": "pasturl/woman-person-20241205",
+                    "version": "VERSION_PLACEHOLDER"  # You'll provide this
+                },
+                "Woman Product K099SS25": {
+                    "path": "pasturl/woman-product-20241205",
+                    "version": "08746f00bc6f5551187429d5704852ebfeeff7c80c05e992dfa2ece659fdb0aa"  # You'll provide this
+                }
             }
         }
-        # Default to first model
-        self.current_model = list(self.MODELS.keys())[0]
-        
-    def set_model(self, model_name):
-        """Set the current model"""
+        # Default to first category and model
+        self.current_category = list(self.MODELS.keys())[0]
+        self.current_model = list(self.MODELS[self.current_category].keys())[0]
+    
+    def set_model(self, category, model_name):
+        """Set the current category and model"""
+        self.current_category = category
         self.current_model = model_name
-        
+    
     def download_image(self, url):
         """Download image from URL and return PIL Image object"""
         try:
@@ -264,7 +326,7 @@ class FluxImageGenerator:
     def generate_image(self, prompt, params):
         """Generate a single image"""
         try:
-            model_info = self.MODELS[self.current_model]
+            model_info = self.MODELS[self.current_category][self.current_model]
             output = client.run(
                 f"{model_info['path']}:{model_info['version']}",
                 input={
@@ -396,14 +458,26 @@ def main():
     # Debug mode toggle in sidebar
     debug_mode = st.sidebar.checkbox("Debug Mode", help="Run with mock data instead of API calls")
     
-    # Sidebar controls
+    # Sidebar controls for model selection
     st.sidebar.title("Model Selection")
+    
+    # Category selector
+    selected_category = st.sidebar.selectbox(
+        "Choose Category",
+        list(generator.MODELS.keys()),
+        help="Select the model category"
+    )
+    
+    # Model selector (filtered by category)
     selected_model = st.sidebar.selectbox(
         "Choose Model",
-        list(generator.MODELS.keys()),
-        help="Select which Flux model to use for generation"
+        list(generator.MODELS[selected_category].keys()),
+        help="Select which model to use for generation"
     )
-    generator.set_model(selected_model)
+    
+    # Update the generator with selected model
+    generator.set_model(selected_category, selected_model)
+    
     st.sidebar.title("Generation Parameters")
     
     # Replace aspect_ratio with width and height selection
@@ -453,11 +527,11 @@ def main():
         with st.spinner("🎨 Generating variations and images..."):
             # Generate prompt variations
             if debug_mode:
-                mock_response = create_mock_variations(prompt, selected_model)
+                mock_response = create_mock_variations(prompt, generator.current_model)
                 variations = [var["prompt"] for var in mock_response["variations"]]
                 st.session_state.variation_data = mock_response["variations"]
             else:
-                variations = generate_prompt_variations(prompt, selected_model)
+                variations = generate_prompt_variations(prompt, generator.current_model)
             
             if not variations:
                 st.warning("Failed to generate prompt variations. Using original prompt only.")
