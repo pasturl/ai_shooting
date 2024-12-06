@@ -328,42 +328,58 @@ class FluxImageGenerator:
         """Generate a single image"""
         try:
             model_info = self.MODELS[self.current_category][self.current_model]
+            # Create API parameters with the correct width and height
+            api_params = {
+                "prompt": prompt,
+                "width": params["width"],
+                "height": params["height"],
+                "num_outputs": params["num_outputs"],
+                "guidance_scale": params["guidance_scale"],
+                "prompt_strength": params["prompt_strength"],
+                "num_inference_steps": params["num_inference_steps"],
+                "model": params["model"],
+                "lora_scale": params["lora_scale"],
+                "extra_lora_scale": params["extra_lora_scale"]
+            }
+            
             output = client.run(
                 f"{model_info['path']}:{model_info['version']}",
-                input={
-                    "prompt": prompt,
-                    **params
-                },
+                input=api_params,
                 api_token=REPLICATE_API_TOKEN
             )
             
-            if output and isinstance(output, list) and len(output) > 0:
-                image = self.download_image(output[0])
-                if image:
-                    # Create timestamp for unique filename
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    
-                    # Create base directory if it doesn't exist
-                    base_dir = pathlib.Path("generated_images")
-                    base_dir.mkdir(parents=True, exist_ok=True)
-                    
-                    # Create safe filename from prompt
-                    safe_prompt = re.sub(r'[^\w\s-]', '', prompt)[:30]
-                    safe_prompt = re.sub(r'[-\s]+', '_', safe_prompt).strip('-_')
-                    
-                    # Save image with timestamp and prompt in filename
-                    filename = f"{timestamp}_{safe_prompt}.{params['output_format']}"
-                    save_path = base_dir / filename
-                    
-                    # Save the image with the specified format and quality
-                    image.save(
-                        save_path, 
-                        format=params['output_format'].upper(),
-                        quality=params['output_quality']
-                    )
-                    
-                    st.success(f"Image saved to: {save_path}")
-                    return image
+            if output and isinstance(output, list):
+                images = []
+                for img_url in output:
+                    image = self.download_image(img_url)
+                    if image:
+                        # Create timestamp for unique filename
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        
+                        # Create base directory if it doesn't exist
+                        base_dir = pathlib.Path("generated_images")
+                        base_dir.mkdir(parents=True, exist_ok=True)
+                        
+                        # Create safe filename from prompt
+                        safe_prompt = re.sub(r'[^\w\s-]', '', prompt)[:30]
+                        safe_prompt = re.sub(r'[-\s]+', '_', safe_prompt).strip('-_')
+                        
+                        # Save image with timestamp and prompt in filename
+                        filename = f"{timestamp}_{safe_prompt}.{params['output_format']}"
+                        save_path = base_dir / filename
+                        
+                        # Save the image with the specified format and quality
+                        image.save(
+                            save_path, 
+                            format=params['output_format'].upper(),
+                            quality=params['output_quality']
+                        )
+                        
+                        st.success(f"Image saved to: {save_path}")
+                        images.append(image)
+                
+                # Return all generated images as a list
+                return images[0] if len(images) == 1 else images
                 
             return None
         except Exception as e:
@@ -389,12 +405,24 @@ class FluxImageGenerator:
             for future in concurrent.futures.as_completed(future_to_prompt):
                 idx, prompt = future_to_prompt[future]
                 try:
-                    image = future.result()
-                    results[idx] = {
-                        'image': image,
-                        'prompt': prompt,
-                        'success': image is not None
-                    }
+                    images = future.result()
+                    # Handle both single image and multiple images cases
+                    if images is not None:
+                        if isinstance(images, list):
+                            # Multiple images were generated
+                            for i, img in enumerate(images):
+                                results[len(results)] = {
+                                    'image': img,
+                                    'prompt': prompt,
+                                    'success': True
+                                }
+                        else:
+                            # Single image was generated
+                            results[idx] = {
+                                'image': images,
+                                'prompt': prompt,
+                                'success': True
+                            }
                 except Exception as e:
                     results[idx] = {
                         'image': None,
@@ -403,8 +431,8 @@ class FluxImageGenerator:
                         'error': str(e)
                     }
             
-            # Sort results by original index
-            return [results[i] for i in range(len(variations))]
+            # Sort results by index
+            return [results[i] for i in range(len(results))]
 
 def create_safe_filename(prompt, max_length=30):
     """Create a safe filename from the prompt"""
@@ -565,75 +593,64 @@ def main():
             # Store results in session state
             st.session_state.generated_results = results
 
-            # Create grid layout for thumbnails
+            # Display generated images in a single column layout
             st.subheader("Generated Images")
-            thumbnail_cols = st.columns(3)
             
-            # First display all thumbnails
+            # Display all images
             for idx, result in enumerate(st.session_state.generated_results):
-                col = thumbnail_cols[idx % 3]
-                with col:
-                    if result['success']:
-                        # Show thumbnail with click functionality
-                        st.image(result['image'], 
-                                caption=f"Variation {idx + 1}", 
-                                use_column_width=True)
-                        if st.button(f"Show Details #{idx + 1}"):
-                            st.session_state.selected_image = idx
-
-            # Show detailed view if an image is selected
-            if 'selected_image' in st.session_state:
-                idx = st.session_state.selected_image
-                result = st.session_state.generated_results[idx]
-                
-                st.markdown("---")
-                st.subheader(f"Variation {idx + 1} Details")
-                
-                # Create two columns for image and details
-                img_col, details_col = st.columns([2, 1])
-                
-                with img_col:
-                    st.image(result['image'], use_column_width=True)
-                
-                with details_col:
-                    st.text_area("Prompt", value=result['prompt'], 
-                               height=100, disabled=True)
-                    
-                    st.markdown("### Generation Parameters")
-                    st.json(params)
-                    
-                    # Save image and create download button
-                    save_dir = save_generated_image(result['image'], 
-                                                  prompt, 
-                                                  idx + 1, 
-                                                  params)
-                    
-                    buffered = BytesIO()
-                    with zipfile.ZipFile(buffered, "w") as zip_file:
-                        image_buffer = BytesIO()
-                        result['image'].save(image_buffer, format="PNG")
-                        zip_file.writestr(
-                            f"generated_image_variation_{idx + 1}.png", 
-                            image_buffer.getvalue()
-                        )
-                        zip_file.writestr(
-                            f"parameters_variation_{idx + 1}.txt",
-                            f"Original Prompt: {prompt}\n"
-                            f"Variation: {result['prompt']}\n"
-                            f"Parameters:\n{params}"
-                        )
-                    
-                    st.download_button(
-                        label=f"Download Variation {idx + 1}",
-                        data=buffered.getvalue(),
-                        file_name=f"generated_content_variation_{idx + 1}.zip",
-                        mime="application/zip"
-                    )
-                    
-                    if st.button("Close Details"):
-                        del st.session_state.selected_image
+                if result['success']:
+                    st.image(result['image'], 
+                            caption=f"Variation {idx + 1}", 
+                            use_column_width=True)
             
-            else:
-                st.info("Click 'Show Details' under any image to see more information")
+            # Create ZIP file with all images and parameters
+            if any(result['success'] for result in st.session_state.generated_results):
+                buffered = BytesIO()
+                with zipfile.ZipFile(buffered, "w") as zip_file:
+                    # Add each image to the ZIP
+                    for idx, result in enumerate(st.session_state.generated_results):
+                        if result['success']:
+                            image_buffer = BytesIO()
+                            result['image'].save(image_buffer, format="PNG")
+                            zip_file.writestr(
+                                f"image_variation_{idx + 1}.png", 
+                                image_buffer.getvalue()
+                            )
+                    
+                    # Add parameters file
+                    params_content = [
+                        "Generation Parameters:",
+                        f"Original Prompt: {prompt}",
+                        f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                        "\nModel Settings:",
+                        f"Category: {selected_category}",
+                        f"Model: {selected_model}",
+                        f"Format: {selected_format} ({params['width']}x{params['height']})",
+                        "\nParameters:",
+                    ]
+                    
+                    # Add all parameters
+                    for key, value in params.items():
+                        params_content.append(f"{key}: {value}")
+                    
+                    # Add variations if used
+                    if use_llm_variations:
+                        params_content.append("\nPrompt Variations:")
+                        for idx, result in enumerate(st.session_state.generated_results):
+                            if result['success']:
+                                params_content.extend([
+                                    f"\nVariation {idx + 1}:",
+                                    f"Prompt: {result['prompt']}"
+                                ])
+                    
+                    zip_file.writestr("generation_parameters.txt", "\n".join(params_content))
+                
+                # Create download button
+                st.download_button(
+                    label="📥 Download All Images and Parameters",
+                    data=buffered.getvalue(),
+                    file_name=f"generated_images_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                    mime="application/zip"
+                )
 if __name__ == "__main__":
     main()
