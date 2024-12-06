@@ -453,6 +453,10 @@ def save_generated_image(image, prompt, variation_num, params):
 def main():
     st.title("🎨 Flux Image Generator")
     
+    # Add checkbox for automatic prompt generation
+    use_llm_variations = st.checkbox("Automatic prompt generator", value=False, 
+                                   help="When checked, it will use AI to generate prompt variations. When unchecked, it will use your prompt directly.")
+    
     # Initialize the generator
     generator = FluxImageGenerator()
     
@@ -525,22 +529,30 @@ def main():
             st.warning("Please enter a prompt first.")
             return
             
-        with st.spinner("🎨 Generating variations and images..."):
-            # Generate prompt variations
-            if debug_mode:
-                mock_response = create_mock_variations(prompt, generator.current_model)
-                variations = [var["prompt"] for var in mock_response["variations"]]
-                st.session_state.variation_data = mock_response["variations"]
+        # Use appropriate spinner text based on whether variations are enabled
+        spinner_text = "🎨 Generating variations and images..." if use_llm_variations else "🎨 Generating image..."
+        with st.spinner(spinner_text):
+            # Generate prompt variations only if checkbox is checked
+            if use_llm_variations:
+                if debug_mode:
+                    mock_response = create_mock_variations(prompt, generator.current_model)
+                    variations = [var["prompt"] for var in mock_response["variations"]]
+                    st.session_state.variation_data = mock_response["variations"]
+                else:
+                    variations = generate_prompt_variations(prompt, generator.current_model)
+                
+                if not variations:
+                    st.warning("Failed to generate prompt variations. Using original prompt only.")
+                    variations = [prompt]
             else:
-                variations = generate_prompt_variations(prompt, generator.current_model)
-            
-            if not variations:
-                st.warning("Failed to generate prompt variations. Using original prompt only.")
+                # Use the original prompt directly
                 variations = [prompt]
+                st.session_state.variation_data = [{"prompt": prompt, "style": "User defined", "focus": "User defined"}]
             
-            # Show progress message
+            # Show progress message with appropriate text
             status = st.empty()
-            status.text("🎨 Generating images in parallel...")
+            status_text = "🎨 Generating images in parallel..." if use_llm_variations else "🎨 Generating image..."
+            status.text(status_text)
             
             # Generate images in parallel
             if debug_mode:
@@ -550,12 +562,15 @@ def main():
             else:
                 results = generator.generate_images_parallel(variations, params)
             
+            # Store results in session state
+            st.session_state.generated_results = results
+
             # Create grid layout for thumbnails
             st.subheader("Generated Images")
             thumbnail_cols = st.columns(3)
             
             # First display all thumbnails
-            for idx, result in enumerate(results):
+            for idx, result in enumerate(st.session_state.generated_results):
                 col = thumbnail_cols[idx % 3]
                 with col:
                     if result['success']:
@@ -565,11 +580,11 @@ def main():
                                 use_column_width=True)
                         if st.button(f"Show Details #{idx + 1}"):
                             st.session_state.selected_image = idx
-            
+
             # Show detailed view if an image is selected
-            if hasattr(st.session_state, 'selected_image'):
+            if 'selected_image' in st.session_state:
                 idx = st.session_state.selected_image
-                result = results[idx]
+                result = st.session_state.generated_results[idx]
                 
                 st.markdown("---")
                 st.subheader(f"Variation {idx + 1} Details")
@@ -617,7 +632,6 @@ def main():
                     
                     if st.button("Close Details"):
                         del st.session_state.selected_image
-                        st.experimental_rerun()
             
             else:
                 st.info("Click 'Show Details' under any image to see more information")
