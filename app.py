@@ -290,6 +290,14 @@ class FluxImageGenerator:
                 
             },
             "Woman": {
+                "Woman 20250118 selection K099SS25": {
+                    "path": "20250118-deich-woman-all-select-mini-16r-1k",
+                    "version": "41bfc27478e19d460a98148bca02fc1543690dd2223a525d979ba8a652a6046f"  # You'll provide this
+                },
+                "Woman 20250113 selection K099SS25": {
+                    "path": "20250113-deich-woman-all-select-mini-16r-1k",
+                    "version": "b7dc336c59ac0b6578f32363f15621d1edbf882a3c201a93d3f7a8e806fca77b"  # You'll provide this
+                },
                 "Woman All K099SS25": {
                     "path": "pasturl/woman-all-20241205",
                     "version": "d07b380d51c3373e0504bb67645b80b5882b094d74f58046690ee77a9e77ec59"  # You'll provide this
